@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PLAY - Sampler</title>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #000;
+            color: white;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #play-button {
+            width: 85vw;
+            height: 55vh;
+            background-color: #1a1a1a;
+            border: 6px solid #333;
+            border-radius: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s, transform 0.1s;
+        }
+
+        .btn-label { font-size: 15vw; font-weight: bold; color: #444; }
+        .file-display { font-size: 3.5vw; margin-top: 20px; color: #333; text-transform: uppercase; font-weight: bold; }
+
+        /* 準備完了：緑 */
+        #play-button.ready {
+            background-color: #004d00;
+            border-color: #00cc00;
+        }
+        #play-button.ready .btn-label { color: #00cc00; }
+        #play-button.ready .file-display { color: #008800; }
+
+        /* 押し込み：エンジ */
+        #play-button.pressing {
+            background-color: #8b0000;
+            transform: scale(0.92);
+        }
+
+        /* 発火：鮮烈な赤 */
+        #play-button.active {
+            background-color: #ff0000 !important;
+            border-color: #ffffff !important;
+        }
+        #play-button.active .btn-label, #play-button.active .file-display { color: #ffffff !important; }
+
+        /* ロック：暗い赤 */
+        #play-button.locking {
+            background-color: #330000;
+            border-color: #660000;
+        }
+        #play-button.locking .btn-label, #play-button.locking .file-display { color: #660000; }
+
+        #status { margin-top: 30px; font-size: 14px; color: #666; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+    <div id="play-button">
+        <div class="btn-label">PLAY</div>
+        <div id="target-name" class="file-display">NO FILE</div>
+    </div>
+
+    <div id="status">INITIALIZING...</div>
+
+    <script>
+        // --- 音源が置いてあるリポジトリのURL ---
+        const SOUND_BASE_URL = "https://mok2884.github.io/sampl-sounds/";
+
+        const playButton = document.getElementById('play-button');
+        const targetDisplay = document.getElementById('target-name');
+        const statusText = document.getElementById('status');
+        
+        let audioContext;
+        let audioBuffer = null;
+        let isLocking = false;
+        let wakeLock = null;
+
+        // URLの末尾 (?file=xxx.wav) からファイル名を取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const fileName = urlParams.get('file');
+
+        const requestWakeLock = async () => {
+            try {
+                if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {}
+        };
+
+        const setupAudio = async (arrayBuffer) => {
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            try {
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                playButton.classList.add('ready');
+                statusText.innerText = "STANDBY OK";
+                requestWakeLock();
+            } catch (e) { 
+                statusText.innerText = "DECODE ERROR"; 
+            }
+        };
+
+        // GitHubから音源を自動取得
+        const loadSound = async () => {
+            if (!fileName) {
+                statusText.innerText = "ERROR: NO FILE SPECIFIED";
+                targetDisplay.innerText = "ADD ?file=filename.wav TO URL";
+                return;
+            }
+
+            const fileTitle = fileName.split('.')[0]; // 拡張子を除いた名前を表示用にする
+            targetDisplay.innerText = fileTitle;
+            statusText.innerText = "LOADING...";
+
+            try {
+                // 音源リポジトリからフェッチ
+                const response = await fetch(SOUND_BASE_URL + fileName);
+                if (!response.ok) throw new Error("File not found");
+                const arrayBuffer = await response.arrayBuffer();
+                await setupAudio(arrayBuffer);
+            } catch (e) {
+                statusText.innerText = "LOAD FAILED: " + fileName;
+                targetDisplay.innerText = "NOT FOUND";
+            }
+        };
+
+        const triggerSequence = () => {
+            if (!audioBuffer || isLocking) return;
+            if (audioContext.state === 'suspended') audioContext.resume();
+
+            isLocking = true;
+            playButton.classList.add('pressing');
+
+            // 物理ボタン風の120msディレイ
+            setTimeout(() => {
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+                source.start(0);
+
+                playButton.classList.remove('pressing');
+                playButton.classList.add('active');
+
+                setTimeout(() => {
+                    playButton.classList.remove('active');
+                    playButton.classList.add('locking');
+                }, 150);
+
+            }, 120);
+
+            // 1秒間の連打防止ロック
+            setTimeout(() => {
+                isLocking = false;
+                playButton.classList.remove('locking');
+            }, 1000);
+        };
+
+        const handleInteraction = (e) => {
+            e.preventDefault();
+            triggerSequence();
+        };
+
+        playButton.addEventListener('touchstart', handleInteraction, {passive: false});
+        playButton.addEventListener('mousedown', handleInteraction);
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                triggerSequence();
+            }
+        });
+
+        // 起動時にロード
+        loadSound();
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') requestWakeLock();
+        });
+    </script>
+</body>
+</html>
