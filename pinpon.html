@@ -78,6 +78,13 @@
                 playButton.classList.add('ready');
                 statusText.innerText = "STANDBY OK";
                 requestWakeLock();
+                
+setInterval(() => {
+    if (audioContext && audioContext.state === 'running') {
+        playBackgroundNoise();
+    }
+}, 10000);
+
             } catch (e) { statusText.innerText = "DECODE ERROR"; }
         };
 
@@ -105,6 +112,7 @@
         const triggerSequence = () => {
             if (!audioBuffer || isLocking) return;
             if (audioContext.state === 'suspended') audioContext.resume();
+            playBackgroundNoise();
             isLocking = true;
             playButton.classList.add('pressing');
             setTimeout(() => {
@@ -134,6 +142,32 @@
                 triggerSequence();
             }
         });
+const playBackgroundNoise = () => {
+    if (!audioContext) return;
+
+    const duration = 0.5;
+    const sampleRate = audioContext.sampleRate;
+    const buffer = audioContext.createBuffer(1, sampleRate * duration, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1);
+    }
+
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+
+    const gain = audioContext.createGain();
+    const now = audioContext.currentTime;
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.002, now + 0.1);
+    gain.gain.setValueAtTime(0.002, now + duration - 0.1);
+    gain.gain.linearRampToValueAtTime(0, now + duration);
+
+    source.connect(gain).connect(audioContext.destination);
+    source.start(now);
+};
 
         loadSound();
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') requestWakeLock(); });
