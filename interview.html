@@ -414,6 +414,7 @@ function addMaterial(){
 
     card.audioRef = audio;
     card.startPoint = 0;
+      card.currentPosition = 0;
 
     card.innerHTML = `
 
@@ -488,6 +489,11 @@ function addMaterial(){
         audio.currentTime = 0;
 
     };
+      audio.addEventListener("timeupdate",()=>{
+
+    card.currentPosition = audio.currentTime;
+
+});
 
     document
         .getElementById("materialList")
