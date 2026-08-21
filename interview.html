@@ -1,1 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interview Recorder</title>
 
+<style>
+
+body{
+    margin:0;
+    background:#1b1b1b;
+    color:#fff;
+    font-family:sans-serif;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+.container{
+    height:100vh;
+    padding:8px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+/* -------------------- */
+/* 録音エリア */
+/* -------------------- */
+
+.rec-area{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+}
+
+.rec-box{
+    background:#2a2a2a;
+    border:1px solid #555;
+    padding:8px;
+}
+
+.rec-header{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:6px;
+}
+
+.rec-title{
+    font-size:18px;
+    font-weight:bold;
+}
+
+.rec-wave{
+    height:70px;
+    background:#111;
+    border:1px solid #444;
+    position:relative;
+    overflow:hidden;
+    margin-bottom:6px;
+}
+
+.rec-wave::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+    repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent 4px,
+        #00d26a 5px,
+        #00d26a 7px
+    );
+    opacity:.7;
+}
+
+.rec-buttons{
+    display:flex;
+    gap:5px;
+}
+
+button{
+    cursor:pointer;
+    padding:4px 8px;
+}
+
+select,
+input{
+    height:28px;
+}
+
+/* -------------------- */
+/* 素材セクション */
+/* -------------------- */
+
+.material-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.material-list{
+    flex:1;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+/* -------------------- */
+/* 素材バー */
+/* -------------------- */
+
+.material{
+
+    border:1px solid #555;
+    background:#2a2a2a;
+
+    padding:4px;
+}
+
+.info-row{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    flex-wrap:wrap;
+}
+
+.info-row input{
+    width:90px;
+}
+
+.comment{
+    width:220px !important;
+}
+
+.duration{
+    width:70px;
+    text-align:center;
+    font-weight:bold;
+    color:#ffd54f;
+}
+
+.wave-row{
+    margin-top:4px;
+}
+
+.wave-small{
+    height:24px;
+    background:#111;
+    border:1px solid #444;
+    position:relative;
+    overflow:hidden;
+}
+
+.wave-small::after{
+    content:"";
+    position:absolute;
+    inset:0;
+
+    background:
+    repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent 3px,
+        #4fc3f7 4px,
+        #4fc3f7 5px
+    );
+
+    opacity:.8;
+}
+
+.start-marker{
+    position:absolute;
+    top:0;
+    bottom:0;
+    width:2px;
+    background:red;
+    left:35%;
+}
+
+.start-text{
+    position:absolute;
+    top:2px;
+    left:36%;
+    color:red;
+    font-size:10px;
+}
+
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- 録音エリア -->
+
+    <div class="rec-area">
+
+        <div class="rec-box">
+
+            <div class="rec-header">
+
+                <div class="rec-title">セ</div>
+
+                INPUT
+
+                <select>
+                    <option>DVS RX1</option>
+                    <option>DVS RX2</option>
+                </select>
+
+            </div>
+
+            <div class="rec-wave"></div>
+
+            <div class="rec-buttons">
+
+               <button onclick="toggleRecording('se', this)">録音</button>
+                <button>MARK</button>
+                <button onclick="addMaterial()">書き出し</button>
+
+            </div>
+
+        </div>
+
+        <div class="rec-box">
+
+            <div class="rec-header">
+
+                <div class="rec-title">パ</div>
+
+                INPUT
+
+                <select>
+                    <option>DVS RX2</option>
+                    <option>DVS RX1</option>
+                </select>
+
+            </div>
+
+            <div class="rec-wave"></div>
+
+            <div class="rec-buttons">
+
+                <button onclick="toggleRecording('pa', this)">録音</button>
+                <button>MARK</button>
+                <button onclick="addMaterial()">書き出し</button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- 素材一覧ヘッダ -->
+
+    <div class="material-header">
+
+        <h3 style="margin:0;">素材一覧</h3>
+
+        <div>
+
+            OUTPUT
+
+            <select>
+                <option>DVS TX1</option>
+                <option>DVS TX2</option>
+                <option>Speaker</option>
+            </select>
+
+        </div>
+
+    </div>
+
+    <!-- 素材一覧 -->
+
+    <div id="materialList" class="material-list">
+
+    </div>
+
+</div>
+
+<script>
+
+let count = 1;
+
+  const recorders = {
+    se: {
+        recorder:null,
+        chunks:[]
+    },
+    pa: {
+        recorder:null,
+        chunks:[]
+    }
+};
+
+function addMaterial(){
+
+    const card = document.createElement("div");
+
+    card.className = "material";
+
+    card.innerHTML = `
+
+        <div class="info-row">
+
+            <span>オール</span>
+            <input value="全セ">
+
+            <span>チーム</span>
+            <input value="阪神">
+
+            <span>名前</span>
+            <input value="選手${count}">
+
+            <span>アナ尻</span>
+            <input class="comment" value="○○○○でした。">
+
+            <span class="duration">00:23.4</span>
+
+            <button>▶</button>
+            <button>■</button>
+
+            <button>R1</button>
+
+            <button>START</button>
+
+            <button>-1</button>
+            <button>-0.1</button>
+            <button>+0.1</button>
+            <button>+1</button>
+
+        </div>
+
+        <div class="wave-row">
+
+            <div class="wave-small">
+
+                <div class="start-marker"></div>
+                <div class="start-text">START</div>
+
+            </div>
+
+        </div>
+
+    `;
+
+    const list = document.getElementById("materialList");
+
+    list.prepend(card);
+
+    count++;
+
+}
+
+  async function toggleRecording(side, button){
+
+    const state = recorders[side];
+
+    if(!state.recorder || state.recorder.state === "inactive"){
+
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
+                audio:true
+            });
+
+        state.chunks = [];
+
+        state.recorder = new MediaRecorder(stream);
+
+        state.recorder.ondataavailable = e=>{
+            state.chunks.push(e.data);
+        };
+
+       state.recorder.onstop = ()=>{
+
+    const blob = new Blob(
+        state.chunks,
+        {type:"audio/webm"}
+    );
+
+ 
+   addRecordedMaterial(blob, side);
+
+};
+        state.recorder.start();
+
+        button.textContent = "停止";
+
+    }else{
+
+        state.recorder.stop();
+
+        button.textContent = "録音";
+
+    }
+}
+
+  function addRecordedMaterial(blob, side){
+
+    const url = URL.createObjectURL(blob);
+
+    const audio = new Audio(url);
+
+    const card = document.createElement("div");
+
+    card.className = "material";
+
+    card.audioRef = audio;
+    card.startPoint = 0;
+
+    card.innerHTML = `
+
+    <div class="info-row">
+
+        <span>オール</span>
+        <input value="${side === 'se' ? '全セ' : '全パ'}">
+
+        <span>チーム</span>
+        <input>
+
+        <span>名前</span>
+        <input>
+
+        <span>アナ尻</span>
+        <input class="comment">
+
+        <span class="duration">読込中...</span>
+
+        <button class="playBtn">▶</button>
+        <button class="stopBtn">■</button>
+
+        <button>R1</button>
+        <button>START</button>
+
+        <button>-1</button>
+        <button>-0.1</button>
+        <button>+0.1</button>
+        <button>+1</button>
+
+    </div>
+
+    <div class="wave-row">
+        <div class="wave-small">
+            <div class="start-marker"></div>
+            <div class="start-text">START</div>
+        </div>
+    </div>
+
+    `;
+
+    audio.addEventListener("loadedmetadata",()=>{
+
+        const dur = audio.duration;
+
+        const min = Math.floor(dur / 60);
+
+        const sec = (dur % 60)
+            .toFixed(1)
+            .padStart(4,"0");
+
+        card.querySelector(".duration")
+            .textContent =
+            `${min}:${sec}`;
+
+    });
+
+    card.querySelector(".playBtn")
+        .onclick = ()=>{
+
+        audio.currentTime =
+            card.startPoint;
+
+        audio.play();
+
+    };
+
+    card.querySelector(".stopBtn")
+        .onclick = ()=>{
+
+        audio.pause();
+        audio.currentTime = 0;
+
+    };
+
+    document
+        .getElementById("materialList")
+        .prepend(card);
+
+}
+/* テスト用 */
+
+
+
+</script>
