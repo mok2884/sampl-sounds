@@ -133,7 +133,12 @@ setInterval(() => {
             }, 1000);
         };
 
-        const handleInteraction = (e) => { e.preventDefault(); triggerSequence(); };
+        const handleInteraction = (e) => {
+    e.preventDefault();
+    const lag = Math.round(performance.now() - e.timeStamp);
+    triggerSequence();
+    statusText.innerText = `INPUT LAG ${lag}ms`;
+};
         playButton.addEventListener('touchstart', handleInteraction, {passive: false});
         playButton.addEventListener('mousedown', handleInteraction);
         window.addEventListener('keydown', (e) => {
@@ -171,6 +176,12 @@ const playBackgroundNoise = () => {
 
         loadSound();
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') requestWakeLock(); });
+   
+    const keepWarm = () => {
+    statusText.style.opacity = 0.6 + 0.4 * Math.sin(performance.now() / 500);
+    requestAnimationFrame(keepWarm);
+};
+requestAnimationFrame(keepWarm);
     </script>
 </body>
 </html>
